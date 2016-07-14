@@ -1,0 +1,125 @@
+# 05/15/2016
+#
+# Script to rank the following settings of PCxN
+# - Summary
+#   > Mean
+#   > Median
+# - Correlation
+#   > Pearson
+#   > Spearman
+#
+# For the overlap cases based on the median |bias|
+# of the weighted average of correlation coefficients
+
+
+rm(list=ls())
+# ==== Functions =====
+# helper function to translate R's line positions
+# stolen from: 
+# http://stackoverflow.com/questions/29125019/get-margin-line-locations-mgp-in-user-coordinates
+line2user <- function(line, side) {
+  lh <- par('cin')[2] * par('cex') * par('lheight')
+  x_off <- diff(grconvertX(0:1, 'inches', 'user'))
+  y_off <- diff(grconvertY(0:1, 'inches', 'user'))
+  switch(side,
+         `1` = par('usr')[3] - line * y_off * lh,
+         `2` = par('usr')[1] - line * x_off * lh,
+         `3` = par('usr')[4] + line * y_off * lh,
+         `4` = par('usr')[2] + line * x_off * lh,
+         stop("side must be 1, 2, 3, or 4", call.=FALSE))
+}
+
+# list to store rankings for each overlap case
+res = vector("list",10)
+names(res) = paste0("over",1:10)
+
+library(rafalib)
+for(over in 1:10){
+  # ==== Ribosome (Overlap) =====
+  # Mean/Pearson
+  ribMnPn = readRDS(paste0("Hide Lab/PCxN/output/Benchmark/RibosomeOver",over,"MnPnShrkJack.RDS"))
+  # Mean/Spearman
+  ribMnSp = readRDS(paste0("Hide Lab/PCxN/output/Benchmark/RibosomeOver",over,"MnSpShrkJack.RDS"))
+  # Median/Pearson
+  ribMdPn = readRDS(paste0("Hide Lab/PCxN/output/Benchmark/RibosomeOver",over,"MdPnShrkJack.RDS"))
+  # Median/Spearman
+  ribMdSp = readRDS(paste0("Hide Lab/PCxN/output/Benchmark/RibosomeOver",over,"MdSpShrkJack.RDS"))
+  
+  # ==== Random (Overlap) ====
+  # Mean/Pearson
+  rndMnPn = readRDS(paste0("Hide Lab/PCxN/output/Benchmark/RandomGSOver",over,"MnPnShrkJack.RDS"))
+  # Mean/Spearman
+  rndMnSp = readRDS(paste0("Hide Lab/PCxN/output/Benchmark/RandomGSOver",over,"MnSpShrkJack.RDS"))
+  # Median/Pearson
+  rndMdPn = readRDS(paste0("Hide Lab/PCxN/output/Benchmark/RandomGSOver",over,"MdPnShrkJack.RDS"))
+  # Median/Spearman
+  rndMdSp = readRDS(paste0("Hide Lab/PCxN/output/Benchmark/RandomGSOver",over,"MdSpShrkJack.RDS"))
+  
+  
+  
+  # ==== Boxplots Bias (No overlap) =====
+  mypar(1,1)
+  png(paste0("Hide Lab/PCxN/doc/Benchmark/figures/rib_v_rnd_over",over,"_shrk_bias_boxplots01.png"),
+      width=800,height=450,pointsize = 15)
+  boxplot(
+    list(
+      abs(ribMnPn$bias_jack),abs(rndMnPn$bias_jack), # Mean/Pearson
+      abs(ribMnSp$bias_jack),abs(rndMnSp$bias_jack), # Mean/Spearman
+      abs(ribMdPn$bias_jack),abs(rndMdPn$bias_jack), # Median/Pearson
+      abs(ribMdSp$bias_jack),abs(rndMdSp$bias_jack)  # Median/Spearman
+    ),
+    names=rep(c("Ribosome","Random"),times=4)
+  )
+  title(paste0("|Bias| Estimates (Overlap ",over,")"),line=2)
+  abline(h=0,col="red")
+  text(x=1.5,y=line2user(line=0.5,side=3),"Mean/Pearson",xpd=T)
+  text(x=3.5,y=line2user(line=0.5,side=3),"Mean/Spearman",xpd=T)
+  text(x=5.5,y=line2user(line=0.5,side=3),"Median/Pearson",xpd=T)
+  text(x=7.5,y=line2user(line=0.5,side=3),"Median/Spearman",xpd=T)
+  dev.off()
+  
+  
+  png(paste0("Hide Lab/PCxN/doc/Benchmark/figures/rib_v_rnd_over",over,"_shrk_bias_boxplots02.png"),
+      width=800,height=450,pointsize = 15)
+  boxplot(list(abs(c(ribMnPn$bias_jack,rndMnPn$bias_jack)),
+               abs(c(ribMnSp$bias_jack,rndMnSp$bias_jack)),
+               abs(c(ribMdPn$bias_jack,rndMdPn$bias_jack)),
+               abs(c(ribMdSp$bias_jack,rndMdSp$bias_jack))),
+          names=c("Mean/Pearson","Mean/Spearman","Median/Pearson","Median/Spearman")
+  )
+  title(paste0("|Bias| Estimates (Overlap ",over,")"),line=2)
+  abline(h=0,col="red")
+  dev.off()
+  
+  # ==== Median |Bias| ====
+  bias_vec = rep(NA,4)
+  names(bias_vec) = c("Mean/Pearson","Mean/Spearman","Median/Pearson","Median/Spearman")
+  
+  
+  bias_vec[1] = median(abs(c(ribMnPn$bias_jack,rndMnPn$bias_jack)))
+  bias_vec[2] = median(abs(c(ribMnSp$bias_jack,rndMnSp$bias_jack)))
+  bias_vec[3] = median(abs(c(ribMdPn$bias_jack,rndMdPn$bias_jack)))
+  bias_vec[4] = median(abs(c(ribMdSp$bias_jack,rndMdSp$bias_jack)))
+  
+  rank(bias_vec*-1)
+  
+  # data frame to store the method rankings
+  el1 = c("Mean","Median")
+  el2 = c("Pearson","Spearman")
+  el3 = c("Liptak","Logit")
+  
+  scoreBoard = matrix(NA,ncol=8,nrow=1)
+  colnames(scoreBoard) = paste(rep(rep(el1,each=2),2),rep(rep(el2,2),2),rep(el3,each=4),sep="/")
+  rownames(scoreBoard) = c("Bias")
+  scoreBoard = as.data.frame(scoreBoard)
+  
+  # ranks based on median variance
+  scoreBoard[1,] = rank(rep(bias_vec,2)*-1)
+  
+  res[[over]] = scoreBoard
+}
+
+saveRDS(res,"Hide Lab/PCxN/output/pcxn_benchmark_ranks_over_bias.RDS")
+
+
+
